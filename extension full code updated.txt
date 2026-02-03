@@ -1,6 +1,7 @@
 import os, json, textwrap, subprocess, hashlib, pathlib, sys, shutil, re, datetime, zipfile, pprint
 
-base = "/mnt/data/ou-link-validator-A"
+# Use a workspace-local build/output folder so it works on Windows/Linux.
+base = os.path.join(os.getcwd(), "ou-link-validator-A")
 if os.path.exists(base):
     shutil.rmtree(base)
 os.makedirs(base, exist_ok=True)
@@ -666,58 +667,49 @@ jobs:
       - uses: actions/checkout@v4
       - name: Use Node.js 20
         uses: actions/setup-node@v4
-        with:
-          node-version: 20.11.1
-          cache: npm
-      - name: Install
-        run: npm ci
-      - name: Lint
-        run: npm run lint
-      - name: Test
-        run: npm test
-      - name: Security scan (npm audit)
-        run: npm audit --audit-level=high
-"""))
-
 ---------- Unit tests ----------
-w("test/textNormalize.test.js", textwrap.dedent("""
+w("test/textNormalize.test.js", textwrap.dedent("""\
 import { normalizePunctuation, normalizeText } from "../src/textNormalize.js";
 
 describe("textNormalize", () => {
-test("normalizePunctuation converts curly apostrophes to ASCII", () => {
-expect(normalizePunctuation("couldn\u2019t")).toBe("couldn't");
-});
+  test("normalizePunctuation converts curly apostrophes to ASCII", () => {
+    expect(normalizePunctuation("couldn\u2019t")).toBe("couldn't");
+  });
 
-test("normalizeText lowercases, trims, collapses whitespace", () => {
-expect(normalizeText(" Hello WORLD \n")).toBe("hello world");
-});
+  test("normalizeText lowercases, trims, collapses whitespace", () => {
+    expect(normalizeText(" Hello WORLD \n")).toBe("hello world");
+  });
 
-test("normalizeText removes combining marks (NFKD)", () => {
-const s = "Cafe\u0301"; // e + combining acute
-expect(normalizeText(s)).toBe("cafe");
-});
+  test("normalizeText removes combining marks (NFKD)", () => {
+    const s = "Cafe\u0301"; // e + combining acute
+    expect(normalizeText(s)).toBe("cafe");
+  });
 });
 """))
 
-w("test/softFail.test.js", textwrap.dedent("""
+w("test/softFail.test.js", textwrap.dedent("""\
 import { compileMarkers, findSoftFailMarker } from "../src/softFail.js";
 
 describe("softFail detection", () => {
-test("findSoftFailMarker matches even with curly apostrophes", () => {
-const body = "We couldn’t find the resource you’re looking for"; // curly apostrophes
-const compiled = compileMarkers(["we couldn't find the resource"]);
-expect(findSoftFailMarker(body, compiled)).toBe("we couldn't find the resource");
-});
+  test("findSoftFailMarker matches even with curly apostrophes", () => {
+    const body = "We couldn’t find the resource you’re looking for"; // curly apostrophes
+    const compiled = compileMarkers(["we couldn't find the resource"]);
+    expect(findSoftFailMarker(body, compiled)).toBe("we couldn't find the resource");
+  });
 
-test("findSoftFailMarker returns null when no marker exists", () => {
-const compiled = compileMarkers(["access denied"]);
-expect(findSoftFailMarker("valid course page", compiled)).toBeNull();
-});
+  test("findSoftFailMarker returns null when no marker exists", () => {
+    const compiled = compileMarkers(["access denied"]);
+    expect(findSoftFailMarker("valid course page", compiled)).toBeNull();
+  });
 
-test("compileMarkers preserves raw values", () => {
-const compiled = compileMarkers(["A", "B"]);
-expect(compiled.map(x => x.raw)).toEqual(["A", "B"]);
-w("test/url.test.js", textwrap.dedent("""
+  test("compileMarkers preserves raw values", () => {
+    const compiled = compileMarkers(["A", "B"]);
+    expect(compiled.map(x => x.raw)).toEqual(["A", "B"]);
+  });
+});
+"""))
+
+w("test/url.test.js", textwrap.dedent("""\
 import { normalizeUrl, isOffHost, includesBadAuthPart } from "../src/url.js";
 
 describe("url utils", () => {
@@ -731,6 +723,15 @@ describe("url utils", () => {
   });
 
   test("includesBadAuthPart", () => {
+    expect(includesBadAuthPart("https://mylearn.oracle.com/login", ["/login")).toBe(true);
+    expect(includesBadAuthPart("https://mylearn.oracle.com/ou/course/1", ["/login")).toBe(false);
+  });
+});
+"""))
+    expect(includesBadAuthPart("https://mylearn.oracle.com/ou/course/1", ["/login"]).toBe(false));
+  });
+});
+"""))
     expect(includesBadAuthPart("https://mylearn.oracle.com/login", ["/login"]).toBe(true));
     expect(includesBadAuthPart("https://mylearn.oracle.com/ou/course/1", ["/login"]).toBe(false));
   });
@@ -766,7 +767,8 @@ If you must keep v1.2.2 code but disable the change, remove the unicode normaliz
 (not recommended) or remove the new marker(s) from SOFT_FAIL_MARKERS.
 """))
 ---------- Create zip artifact ----------
-zip_path = "/mnt/data/ou-link-validator-A_solution.zip"
+# Place zip artifact inside the build folder
+zip_path = os.path.join(base, "ou-link-validator-A_solution.zip")
 if os.path.exists(zip_path):
 os.remove(zip_path)
 
