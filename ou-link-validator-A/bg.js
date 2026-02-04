@@ -39,13 +39,16 @@ function waitForNavigationComplete(tabId, timeoutMs = 10000) {
       if (done) return; done = true;
       try { chrome.webNavigation.onCompleted.removeListener(onComplete); } catch {}
       try { chrome.webNavigation.onErrorOccurred.removeListener(onError); } catch {}
+      try { chrome.tabs.onRemoved.removeListener(onRemoved); } catch {}
       clearTimeout(timer);
       resolve();
     };
     const onComplete = (details) => { if (details.tabId === tabId && details.frameId === 0) finish(); };
     const onError = (details) => { if (details.tabId === tabId && details.frameId === 0) finish(); };
+    const onRemoved = (id) => { if (id === tabId) finish(); };
     chrome.webNavigation.onCompleted.addListener(onComplete);
     chrome.webNavigation.onErrorOccurred.addListener(onError);
+    chrome.tabs.onRemoved.addListener(onRemoved);
     const timer = setTimeout(finish, timeoutMs);
   });
 }
