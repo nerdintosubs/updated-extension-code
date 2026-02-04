@@ -1,7 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<coverage generated="1770182668290" clover="3.2.0">
-  <project timestamp="1770182668290" name="All files">
-    <metrics statements="18" coveredstatements="17" conditionals="20" coveredconditionals="11" methods="9" coveredmethods="9" elements="47" coveredelements="37" complexity="0" loc="18" ncloc="18" packages="1" files="3" classes="3"/>
+<coverage generated="1770183213029" clover="3.2.0">
+  <project timestamp="1770183213029" name="All files">
+    <metrics statements="21" coveredstatements="20" conditionals="24" coveredconditionals="15" methods="10" coveredmethods="10" elements="55" coveredelements="45" complexity="0" loc="21" ncloc="21" packages="1" files="4" classes="4"/>
+    <file name="csvSanitize.js" path="C:\Users\Shubham\Documents\updated extension code\ou-link-validator-A\src\csvSanitize.js">
+      <metrics statements="3" coveredstatements="3" conditionals="4" coveredconditionals="4" methods="1" coveredmethods="1"/>
+      <line num="8" count="9" type="cond" truecount="2" falsecount="0"/>
+      <line num="9" count="7" type="stmt"/>
+      <line num="10" count="7" type="cond" truecount="2" falsecount="0"/>
+    </file>
     <file name="softFail.js" path="C:\Users\Shubham\Documents\updated extension code\ou-link-validator-A\src\softFail.js">
       <metrics statements="5" coveredstatements="5" conditionals="10" coveredconditionals="7" methods="3" coveredmethods="3"/>
       <line num="9" count="4" type="cond" truecount="1" falsecount="1"/>
