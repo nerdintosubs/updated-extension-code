@@ -1,100 +1,160 @@
-# Implementation Plan
+# Implementation Plan (Improved)
 
-[Overview]
-Elevate the OU Link Validator extension’s robustness and developer experience by hardening navigation/tab lifecycle, minimizing permissions, fixing CI/tests, and documenting a clean rollout path.
+Overview
+Elevate the OU Link Validator extension’s robustness, security, and developer experience. Focus areas: resilient navigation/tab lifecycle, minimal and explicit permissions, reliable CI/tests, safe CSV export, and a clear rollout/rollback path.
 
-This plan formalizes improvements already identified in REVIEW.md and aligns them into a cohesive, auditable change set. The extension is MV3 with an ESM service worker that opens background tabs, injects a probe, and streams results to the popup for CSV/clipboard export. Key needs are: reliable navigation completion handling, safe cleanup when the popup disconnects, a minimal permission footprint, unbroken CI, and accurate tests. These updates reduce flakiness (listener leaks, orphaned tabs), simplify CSV (drop unused http_status), and ensure contributors can run lint/tests via CI.
+Goals
+- Eliminate listener leaks, orphaned tabs, and work-after-disconnect races in MV3 service workers.
+- Minimize permissions and host access while preserving functionality.
+- Make CSV export safe for spreadsheet ingestion (e.g., Excel formula injection) and consistent with UI.
+- Stabilize CI with reproducible installs, linting, tests, and audits.
+- Provide a verifiable set of acceptance criteria and a rollback plan.
 
-[Types]
-Clarify result and config shapes to keep UI/worker aligned.
+Non‑Goals
+- Adding HTTP status capture via webRequest (may be reconsidered later).
+- Migrating to TypeScript in this iteration (we provide JSDoc types to enable future TS adoption).
 
-Type definitions (informal JS/JSDoc or TS if adopted later):
-- ResultRecord
-  - url: string (original URL)
-  - fin: string (final URL after navigation)
-  - ok: boolean (PASS/FAIL)
-  - why: "RENDER_OK" | "NO_SELECTOR" | "ERROR_TEXT" | "OFF_HOST_REDIRECT" | "AUTH_REDIRECT" | "INJECT_ERR" | "BG_ERR" | "UNKNOWN"
-  - mark: string (matched text snippet if any)
-  - selector: string (selector that matched, if any)
-  - at: string (ISO timestamp)
-- BgConfig
-  - HOST: string
-  - BAD_URL_PARTS: string[] (case-insensitive fragments)
-  - SOFT_FAIL_MARKERS: string[] (plain text markers)
-  - SELECTORS: string[] (DOM selectors to indicate successful render)
-  - TIMEOUT_MS: number (>= 2000)
-  - DEBUG: boolean
+Architecture Snapshot
+- MV3 ESM service worker opens background tabs, injects a probe, streams results to the popup via Port messaging, and supports CSV/clipboard export.
+- Long‑lived Port from the popup keeps the worker alive during runs; background state is scoped per‑port.
 
-[Files]
-Modify existing extension sources and dev/CI files; no new runtime deps.
+Types (JSDoc; TS‑ready)
+Use JSDoc to define shapes and enable editor tooling; these can be lifted to .d.ts later.
 
-New files:
-- implementation_plan.md (this plan; repository root)
+/** @typedef {Object} ResultRecord
+ *  @property {string} url      Original URL
+ *  @property {string} fin      Final URL after navigation
+ *  @property {boolean} ok      Pass/Fail
+ *  @property {('RENDER_OK'|'NO_SELECTOR'|'ERROR_TEXT'|'OFF_HOST_REDIRECT'|'AUTH_REDIRECT'|'INJECT_ERR'|'BG_ERR'|'UNKNOWN')} why
+ *  @property {string=} mark    Matched text snippet if any
+ *  @property {string=} selector Selector that matched, if any
+ *  @property {string} at       ISO timestamp
+ */
 
-Modify existing files (or their generators, if using a build script that writes them):
-- manifest.json: drop unused "storage" permission (minimize footprint)
-- popup.js: remove http_status column from CSV and UI; keep headers in sync
+/** @typedef {Object} BgConfig
+ *  @property {string} HOST
+ *  @property {string[]} BAD_URL_PARTS   Case‑insensitive fragments
+ *  @property {string[]} SOFT_FAIL_MARKERS Plain text markers
+ *  @property {string[]} SELECTORS       DOM selectors indicating successful render
+ *  @property {number} TIMEOUT_MS        >= 2000
+ *  @property {boolean} DEBUG
+ */
+
+Security and Permissions
+- Drop unused storage permission. Prefer host_permissions limited to the target HOST; avoid broad patterns. Use scripting and tabs only as required.
+- No collection of PII; all processing happens locally. Ensure DEBUG logging excludes sensitive content.
+
+Files to Modify
+- manifest.json: remove storage; restrict host_permissions to minimally necessary origins.
+- popup.js: remove http_status column; align UI and CSV headers; add CSV hardening (see below).
 - bg.js:
-  - Replace waitForNavigationComplete with a version that removes listeners on both success and timeout, scopes to frameId === 0, and listens to onErrorOccurred
-  - Add safePost wrapper for port.postMessage
-  - Track per-port openTabs: Set<number>; cleanup tabs on disconnect
-  - Guard processing when the port is gone; do not continue jobs
-  - Post {type:"done"} via safePost
-- src/injectedProbe.js: keep normalization/soft-fail logic; optionally retain BAD URL check for defense-in-depth
-- README.md: clean dev instructions (npm ci, lint, test)
-- .github/workflows/ci.yml: valid YAML, use npm ci, run lint/test/audit
-- test/url.test.js: fix broken string/entity and ensure imports/expectations are correct
-- test/softFail.test.js: ensure file integrity and closing braces
+  - Replace waitForNavigationComplete with a main‑frame‑only, error‑aware, leak‑free implementation (details below).
+  - Add safePost wrapper for Port messaging.
+  - Track per‑port openTabs: Set<number>; close tabs on disconnect; guard against missing state.
+  - Post {type: 'done'} via safePost.
+- src/injectedProbe.js: retain normalization and soft‑fail logic; optionally keep BAD URL defense‑in‑depth.
+- README.md: developer workflow (npm ci, npm run lint, npm test), manual QA steps.
+- .github/workflows/ci.yml: Node 20.x, npm ci, lint, test, audit; cache npm; mark workflow as failing on warnings that break builds.
+- test/url.test.js and test/softFail.test.js: fix strings/imports; add coverage for new utilities.
+- If a generator script emits packaged files, apply mirrored edits there to keep outputs consistent.
 
-If the repository uses a single generator script (e.g., extension full code updated.txt) that writes the above files to a packaging folder, apply the same edits to the generated content within that script to keep outputs consistent.
+Detailed Background Changes
+1) waitForNavigationComplete(tabId, timeoutMs=10000)
+- Listen to chrome.webNavigation.onCompleted and onErrorOccurred with filters: {tabId, frameId: 0}.
+- Also listen to chrome.tabs.onRemoved for the tabId to abort early.
+- Use a one‑shot pattern that removes all listeners on resolve, reject, or timeout.
+- Prefer details.transitionType and url checks when relevant; ignore subframe events.
 
-[Functions]
-Adjust background worker functions; no new classes introduced.
+Pseudo‑implementation:
+// Note: real code should ensure listeners are removed exactly once
+function waitForNavigationComplete(tabId, timeoutMs = 10000) {
+  return new Promise((resolve, reject) => {
+    let done = false;
+    const off = [];
+    const finish = (fn) => (evt) => { if (done) return; done = true; off.forEach((u) => u()); fn(evt); };
 
-New/modified functions:
-- waitForNavigationComplete(tabId: number, timeoutMs = 10000): Promise<void> (bg.js)
-  - Add onErrorOccurred, frameId===0 gating, and proper removal of listeners on success/timeout.
-- safePost(port, msg) (bg.js)
-  - Wrap port.postMessage in try/catch to avoid exceptions when popup closes.
-- processJob(job, port, cfg) (bg.js)
-  - Record created tabId in per-port openTabs; short-circuit if portState missing; safePost results; always remove tab and delete from openTabs in finally.
-- pump(port) (bg.js)
-  - Use safePost for done; respect state disappearance.
-- onConnect/onDisconnect handlers (bg.js)
-  - Add openTabs tracking; close all tabs on disconnect; delete state.
+    const onOk = finish(() => resolve());
+    const onErr = finish((e) => reject(e));
 
-Removed/avoided:
-- Eliminate reliance on the previously leaked onCompleted handler.
-- Remove http_status from result object and CSV (until a dedicated webRequest capture is desired later).
+    const rm1 = (h) => chrome.webNavigation.onCompleted.removeListener(h);
+    const rm2 = (h) => chrome.webNavigation.onErrorOccurred.removeListener(h);
+    const rm3 = (h) => chrome.tabs.onRemoved.removeListener(h);
 
-[Classes]
-No classes exist or are required; all changes are within functional modules.
+    const h1 = (d) => { if (d.tabId === tabId && d.frameId === 0) onOk(d); };
+    const h2 = (d) => { if (d.tabId === tabId && d.frameId === 0) onErr(d); };
+    const h3 = (id) => { if (id === tabId) onErr(new Error('tab-removed')); };
 
-No new classes; no inheritance changes.
+    chrome.webNavigation.onCompleted.addListener(h1);
+    chrome.webNavigation.onErrorOccurred.addListener(h2);
+    chrome.tabs.onRemoved.addListener(h3);
+    off.push(() => rm1(h1), () => rm2(h2), () => rm3(h3));
 
-[Dependencies]
-No runtime dependencies added; dev tooling only.
+    const t = setTimeout(() => onErr(new Error('nav-timeout')), timeoutMs);
+    off.push(() => clearTimeout(t));
+  });
+}
 
-- Keep devDependencies pinned: eslint 8.57.0, jest 29.7.0, jsdom 24.0.0
-- Use npm ci in CI for reproducible installs
-- No addition of webRequest permission at this time; reconsider if HTTP status capture is needed later
+2) safePost(port, msg)
+function safePost(port, msg) {
+  try { port.postMessage(msg); } catch { /* popup closed */ }
+}
 
-[Testing]
-Maintain Jest unit tests and add CI checks.
+3) Per‑port lifecycle and cancellation
+- State map keyed by port.name or port.sender.tab?.id: { queue, openTabs:Set<number>, aborted:boolean, cfg }.
+- onConnect: initialize state; onDisconnect: mark aborted, close tabs, delete state.
+- All async flows must check for state existence before proceeding; jobs should short‑circuit if aborted.
 
-- Fix test/url.test.js string literal and imports
-- Ensure softFail and normalize tests pass (unicode apostrophes, NFKD)
-- CI workflow: checkout, setup-node@v4, npm ci, lint, test, npm audit --audit-level=high
-- Manual validation: load unpacked extension in Chrome, test URLs that PASS/FAIL, ensure tabs close and results stream until done even if popup stays open; verify behavior when closing popup mid-run (no orphan tabs)
+4) processJob(job, port, cfg)
+- Open a background tab, record tabId in openTabs, await waitForNavigationComplete, inject probe, safePost results, remove tab in finally.
+- If port state disappears at any point, stop immediately and cleanup.
 
-[Implementation Order]
-Apply changes in a safe sequence to minimize regressions.
+Popup and CSV Hardening
+- Remove http_status field.
+- Escape values for CSV and mitigate formula injection by prefixing leading =, +, -, or @ with a single quote (').
+- Keep header order consistent between UI table and CSV export; include ISO timestamp and final URL.
 
-1. Update CI YAML (.github/workflows/ci.yml) and README.md
-2. Modify manifest.json to drop unused "storage" permission
-3. Update popup.js to remove http_status column and adjust CSV
-4. Implement bg.js hardening: waitForNavigationComplete, safePost, port/openTabs lifecycle, and error handling
-5. Ensure src/injectedProbe.js remains self-contained; keep normalization
-6. Fix/clean unit tests (test/url.test.js, test/softFail.test.js)
-7. Run lint/tests locally; load unpacked extension and verify PASS/FAIL flows
-8. Prepare release notes (CHANGELOG) and tag
+CI
+- Node 20.x; actions/setup-node@v4 with npm cache: true.
+- Steps: checkout, setup‑node, npm ci, npm run lint, npm test -- --ci --coverage, npm audit --omit=dev --audit-level=high.
+- Fail the job on lint errors and when coverage drops below threshold (configure Jest coverageThresholds).
+
+Testing
+- Unit tests: url normalization (NFKD), softFail markers, CSV escaping, safePost no‑throw behavior, waitForNavigationComplete resolving/rejecting on event simulation.
+- Use Jest fake timers for timeout behavior; add lightweight event bus shims for chrome.* to simulate events.
+- Manual QA: validate PASS/FAIL flows, verify tabs are closed automatically, verify results continue to stream while popup stays open, and verify no orphan tabs when the popup is closed mid‑run.
+
+Acceptance Criteria
+- No listener leaks: after each navigation attempt, listeners are removed (verified by test counters).
+- No orphan tabs on popup close: onDisconnect closes all tabs in openTabs within 500ms.
+- CSV export contains no http_status, quotes values safely, and opens without warnings in Excel/Sheets.
+- CI passes on a clean clone with npm ci, lint, test, and audit; branch protection requires green CI.
+- Manifest contains no storage permission; host_permissions are specific to configured HOST.
+
+Rollout and Rollback
+- Work on a feature branch; open PR with linked issue and checklist below.
+- Release as a minor version; document changes in CHANGELOG.md.
+- If regressions occur, rollback by republishing previous version and reverting the PR; keep docs/ROLLBACK.md updated.
+
+Risks and Mitigations
+- MV3 service worker suspension during long operations: mitigated by long‑lived Port from popup; ensure pump keeps work bounded and observable.
+- Flaky navigation on heavy pages: increase TIMEOUT_MS per config; report BG_ERR and proceed.
+- Over‑restrictive host permissions blocking valid URLs: document HOST configuration and allow override via build‑time config.
+
+Implementation Order
+1) CI and docs: .github/workflows/ci.yml, README.md.
+2) Permissions: manifest.json.
+3) Popup CSV hardening and UI header alignment.
+4) Background hardening: waitForNavigationComplete, safePost, per‑port lifecycle and cleanup.
+5) Probe review: normalization and soft‑fail remain intact.
+6) Tests: fix existing and add new ones for CSV and navigation utilities.
+7) Local validation: lint, tests, load unpacked, manual QA.
+8) Release notes and tag.
+
+Contributor Checklist (to use in PRs)
+- [ ] CI green (lint, tests, audit)
+- [ ] No storage permission in manifest; host_permissions minimized
+- [ ] Popup CSV safe and aligned with UI
+- [ ] Background listeners removed on resolve/timeout/error
+- [ ] Tabs closed on popup disconnect; no orphan tabs
+- [ ] Tests updated/added with coverage at or above threshold
+
