@@ -16,6 +16,6 @@ describe("csvSanitize", () => {
   test("passes through safe values", () => {
     expect(csvSanitize("hello")).toBe("hello");
     expect(csvSanitize(123)).toBe("123");
-    expect(csvSanitize("(A1)")) .toBe("(A1)");
+    expect(csvSanitize("(A1)")).toBe("(A1)");
   });
 });

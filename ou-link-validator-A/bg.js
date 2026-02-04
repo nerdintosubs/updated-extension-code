@@ -4,7 +4,7 @@ import { normalizeUrl, isOffHost, includesBadAuthPart } from "./src/url.js";
 // MV3 background service worker for render-based validation
 const CONFIG = {
   HOST: "mylearn.oracle.com",
-  BAD_URL_PARTS: ["/login","/signin","/sign-in","/sso","/oauth","/auth","idp","saml"],
+  BAD_URL_PARTS: ["/login", "/signin", "/sign-in", "/sso", "/oauth", "/auth", "idp", "saml"],
   SOFT_FAIL_MARKERS: [
     "we couldn't find the resource",
     "we couldnt find the resource", // small variant (missing apostrophe)
@@ -14,15 +14,65 @@ const CONFIG = {
     "not authorized",
     "permission denied"
   ],
-  // Heuristics for a rendered course page
+  // Expanded selectors for better course page detection (Oracle MyLearn)
+  // Matches various course/learning path/content page patterns:
+  // - Main content h1/h2/h3 headings
+  // - Data-testid/data-test attributes for courses/learning-paths
+  // - Class-based selectors for course containers
+  // - Role-based selectors for accessibility
+  // - Breadcrumb/meta/card patterns
   SELECTORS: [
+    // Primary: main content headings
     "main h1",
+    "main h2",
+    "main h3",
+    "[role=\"main\"] h1",
+    "[role=\"main\"] h2",
+
+    // Course-specific data attributes
     "[data-testid*=\"course\"]",
+    "[data-testid*=\"learning\"]",
+    "[data-testid*=\"path\"]",
     "[data-test*=\"course\"]",
+    "[data-test*=\"learning\"]",
+
+    // Learning path and course container classes
     "[class*=\"learning-path\"]",
     "[class*=\"course\"]",
+    "[class*=\"course-card\"]",
+    "[class*=\"course-content\"]",
+    "[class*=\"course-title\"]",
+    "[class*=\"page-title\"]",
+    "[class*=\"page-heading\"]",
+
+    // Article and semantic section headings
     "article h1",
-    "header h1"
+    "article h2",
+    "article h3",
+    "section h1",
+    "section h2",
+
+    // Header/page structure
+    "header h1",
+    "header h2",
+    "[class*=\"header\"] h1",
+    "[class*=\"page-header\"] h1",
+
+    // Breadcrumb/metadata patterns (course context indicators)
+    "[class*=\"breadcrumb\"] a",
+    "[class*=\"course-meta\"]",
+    "[class*=\"course-info\"]",
+    "[attr*=\"course\"]",
+
+    // Content area selectors (fallback patterns)
+    ".content h1",
+    ".main-content h1",
+    "[id*=\"content\"] h1",
+    "[id*=\"main\"] h1",
+
+    // Role-based content detection
+    "[role=\"article\"] h1",
+    "[role=\"region\"] h1"
   ],
   TIMEOUT_MS: 12000,
   DEBUG: false
@@ -32,29 +82,56 @@ function logDebug(cfg, ...args) {
   if (cfg?.DEBUG) console.debug("[OU Link Validator]", ...args);
 }
 
+/**
+ * Wait for main-frame navigation to complete or error.
+ * Robust cleanup: removes all listeners on success, error, or timeout.
+ * Scope to frameId === 0 (main frame only).
+ */
 function waitForNavigationComplete(tabId, timeoutMs = 10000) {
   return new Promise((resolve) => {
     let done = false;
+
     const finish = () => {
-      if (done) return; done = true;
-      try { chrome.webNavigation.onCompleted.removeListener(onComplete); } catch {}
-      try { chrome.webNavigation.onErrorOccurred.removeListener(onError); } catch {}
-      try { chrome.tabs.onRemoved.removeListener(onRemoved); } catch {}
+      if (done) return;
+      done = true;
+
+      // Clean up all listeners - critical to prevent leaks
+      try { chrome.webNavigation.onCompleted.removeListener(onComplete); } catch { }
+      try { chrome.webNavigation.onErrorOccurred.removeListener(onError); } catch { }
+      try { chrome.tabs.onRemoved.removeListener(onRemoved); } catch { }
       clearTimeout(timer);
+
       resolve();
     };
-    const onComplete = (details) => { if (details.tabId === tabId && details.frameId === 0) finish(); };
-    const onError = (details) => { if (details.tabId === tabId && details.frameId === 0) finish(); };
-    const onRemoved = (id) => { if (id === tabId) finish(); };
+
+    // Main frame navigation completed successfully
+    const onComplete = (details) => {
+      if (details.tabId === tabId && details.frameId === 0) finish();
+    };
+
+    // Main frame navigation failed
+    const onError = (details) => {
+      if (details.tabId === tabId && details.frameId === 0) finish();
+    };
+
+    // Tab was closed/removed (cleanup case)
+    const onRemoved = (id) => {
+      if (id === tabId) finish();
+    };
+
     chrome.webNavigation.onCompleted.addListener(onComplete);
     chrome.webNavigation.onErrorOccurred.addListener(onError);
     chrome.tabs.onRemoved.addListener(onRemoved);
+
     const timer = setTimeout(finish, timeoutMs);
   });
 }
 
+/**
+ * Safe port message send - wrapped to prevent errors when port disconnects.
+ */
 function safePost(port, msg) {
-  try { port.postMessage(msg); } catch {}
+  try { port.postMessage(msg); } catch { }
 }
 
 // Per-connection (popup session) state
@@ -78,7 +155,7 @@ async function processJob(job, port, effCfg) {
     try {
       const info = await chrome.tabs.get(tabId);
       finalUrl = info.url || job.norm;
-    } catch {}
+    } catch { }
 
     const offHost = isOffHost(finalUrl, effCfg.HOST);
     const badAuth = includesBadAuthPart(finalUrl, effCfg.BAD_URL_PARTS);
@@ -108,12 +185,14 @@ async function processJob(job, port, effCfg) {
 
     safePost(port, { type: "progress", result: out });
   } catch (e) {
-    safePost(port, { type: "progress", result: {
-      url: job.orig, fin: null, ok: false, why: "BG_ERR", mark: String(e), selector: "", at
-    }});
+    safePost(port, {
+      type: "progress", result: {
+        url: job.orig, fin: null, ok: false, why: "BG_ERR", mark: String(e), selector: "", at
+      }
+    });
   } finally {
     if (tabId != null) {
-      try { await chrome.tabs.remove(tabId); } catch {}
+      try { await chrome.tabs.remove(tabId); } catch { }
       const state = portState.get(port);
       if (state) state.openTabs.delete(tabId);
     }
@@ -164,7 +243,7 @@ chrome.runtime.onConnect.addListener((port) => {
     const st = portState.get(port);
     portState.delete(port);
     if (st && st.openTabs) {
-      for (const id of st.openTabs) { try { chrome.tabs.remove(id); } catch {} }
+      for (const id of st.openTabs) { try { chrome.tabs.remove(id); } catch { } }
     }
   });
 });

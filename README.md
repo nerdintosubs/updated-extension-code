@@ -87,6 +87,19 @@ See also: ou-link-validator-A/README.md for the full QA checklist and troublesho
 - Rollback plan: ou-link-validator-A/docs/ROLLBACK.md
 - Suggested commit history: ou-link-validator-A/docs/COMMIT_HISTORY.md
 
+## Additional documentation
+The extension folder contains detailed engineering docs:
+- ou-link-validator-A/CONFIG.md
+- ou-link-validator-A/ARCHITECTURE.md
+- ou-link-validator-A/DEVGUIDE.md
+- ou-link-validator-A/FILES_REFERENCE.md
+- ou-link-validator-A/VERIFICATION_MATRIX.md
+- ou-link-validator-A/COMPLETION_CHECKLIST.md
+- ou-link-validator-A/BEFORE_AFTER.md
+- ou-link-validator-A/RESTRUCTURE.md
+- ou-link-validator-A/RESTRUCTURE_SUMMARY.md
+- ou-link-validator-A/INDEX.md
+
 ## Contributing
 - Open a PR with clear description, screenshots (if UI changes), and updated tests/QA notes
 - Lint and tests must pass locally

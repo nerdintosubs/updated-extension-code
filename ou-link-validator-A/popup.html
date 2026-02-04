@@ -1,22 +1,58 @@
 <!doctype html>
 <html>
+
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>OU Link Validator</title>
   <style>
-    body { font: 13px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; width: 420px; margin: 12px; }
-    textarea { width: 100%; height: 120px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
-    button { margin: 6px 6px 0 0; }
-    .ok { color: #0b6b0b; }
-    .fail { color: #a10b0b; }
-    #actionStatus { margin: 8px 0; }
-    details { margin-top: 8px; }
-    label { display: block; margin: 6px 0 2px; }
-    input[type="number"] { width: 120px; }
-    pre { white-space: pre-wrap; }
+    body {
+      font: 13px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      width: 420px;
+      margin: 12px;
+    }
+
+    textarea {
+      width: 100%;
+      height: 120px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    button {
+      margin: 6px 6px 0 0;
+    }
+
+    .ok {
+      color: #0b6b0b;
+    }
+
+    .fail {
+      color: #a10b0b;
+    }
+
+    #actionStatus {
+      margin: 8px 0;
+    }
+
+    details {
+      margin-top: 8px;
+    }
+
+    label {
+      display: block;
+      margin: 6px 0 2px;
+    }
+
+    input[type="number"] {
+      width: 120px;
+    }
+
+    pre {
+      white-space: pre-wrap;
+    }
   </style>
 </head>
+
 <body>
   <h3>Paste MyLearn Links</h3>
   <textarea id="linksInput" placeholder="https://mylearn.oracle.com/ou/course/..."></textarea>
@@ -36,17 +72,46 @@
     <label>Timeout (ms): <input id="timeoutMs" type="number" min="2000" step="500" value="12000"></label>
     <label>Concurrency: <input id="concurrency" type="number" min="1" max="6" step="1" value="3"></label>
     <label>Selectors (one per line):</label>
-    <textarea id="selectorsInput" style="height: 110px;">main h1
+    <textarea id="selectorsInput" style="height: 140px;">main h1
+main h2
+main h3
+[role="main"] h1
+[role="main"] h2
 [data-testid*="course"]
+[data-testid*="learning"]
+[data-testid*="path"]
 [data-test*="course"]
+[data-test*="learning"]
 [class*="learning-path"]
 [class*="course"]
+[class*="course-card"]
+[class*="course-content"]
+[class*="course-title"]
+[class*="page-title"]
+[class*="page-heading"]
 article h1
-header h1</textarea>
+article h2
+article h3
+section h1
+section h2
+header h1
+header h2
+[class*="header"] h1
+[class*="page-header"] h1
+[class*="breadcrumb"] a
+[class*="course-meta"]
+[class*="course-info"]
+.content h1
+.main-content h1
+[id*="content"] h1
+[id*="main"] h1
+[role="article"] h1
+[role="region"] h1</textarea>
     <label><input id="debug" type="checkbox"> Debug logging (service worker console)</label>
   </details>
 
   <div id="result" aria-busy="false"></div>
   <script src="popup.js"></script>
 </body>
+
 </html>
