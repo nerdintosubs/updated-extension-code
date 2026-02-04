@@ -16,6 +16,50 @@ const setButtons = st => {
 };
 const status = msg => { $("actionStatus").textContent = msg; };
 
+// ----- Defaults handshake with background -----
+function fetchDefaults(){
+  return new Promise((resolve, reject) => {
+    try {
+      chrome.runtime.sendMessage({ type: "getDefaults" }, (resp) => {
+        if (chrome.runtime.lastError) {
+          return reject(chrome.runtime.lastError);
+        }
+        resolve(resp || {});
+      });
+    } catch (e) { reject(e); }
+  });
+}
+
+function setDefaults(resp){
+  try {
+    if (resp && Array.isArray(resp.selectors) && resp.selectors.length) {
+      $("selectorsInput").value = resp.selectors.join("\n");
+    }
+    if (resp && typeof resp.timeoutMs === "number") {
+      $("timeoutMs").value = String(resp.timeoutMs);
+    }
+    if (resp && typeof resp.concurrency === "number") {
+      $("concurrency").value = String(resp.concurrency);
+    }
+    const hint = $("defaultsHint");
+    if (hint) hint.textContent = "Defaults loaded from background";
+  } catch {}
+}
+
+window.addEventListener("DOMContentLoaded", () => {
+  fetchDefaults().then(setDefaults).catch(() => {
+    const hint = $("defaultsHint");
+    if (hint) hint.textContent = "Using built-in popup defaults";
+  });
+
+  const resetBtn = $("resetDefaultsBtn");
+  if (resetBtn) {
+    resetBtn.addEventListener("click", () => {
+      fetchDefaults().then(setDefaults).catch(() => status("Could not load defaults"));
+    });
+  }
+});
+
 function isMyLearn(u){
   try {
     const x = new URL(u.trim());

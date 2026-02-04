@@ -247,3 +247,15 @@ chrome.runtime.onConnect.addListener((port) => {
     }
   });
 });
+
+// Provide defaults to popup (single source of truth from background)
+chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  if (!msg || typeof msg !== "object") return;
+  if (msg.type === "getDefaults") {
+    sendResponse({
+      selectors: CONFIG.SELECTORS,
+      timeoutMs: CONFIG.TIMEOUT_MS,
+      concurrency: 3,
+    });
+  }
+});
