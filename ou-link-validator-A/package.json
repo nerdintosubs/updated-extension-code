@@ -3,12 +3,17 @@
   "version": "1.2.2",
   "private": true,
   "description": "Dev tooling for OU Link Validator (tests/lint/ci).",
+  "type": "module",
   "engines": {
     "node": ">=20.11.0"
   },
   "scripts": {
     "lint": "eslint .",
-    "test": "jest --coverage"
+    "test": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --coverage"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "transform": {}
   },
   "devDependencies": {
     "eslint": "8.57.0",
