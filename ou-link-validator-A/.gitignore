@@ -1,0 +1,15 @@
+# Dependencies
+node_modules/
+
+# Test coverage
+coverage/
+
+# Build/pack artifacts
+*.zip
+*.tar
+*.tar.gz
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+*.log
