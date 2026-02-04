@@ -9,3 +9,18 @@
 
 ### Migration / Compatibility
 - Background service worker is now an ES module (`"type": "module"`). If you have custom forks that relied on `importScripts()` in bg.js, migrate to ESM `import` statements.
+
+## 1.2.3 - Robustness + CSV safety
+### Added
+- CSV formula-injection mitigation in popup export (prefixes values starting with =, +, -, @ with a single quote before escaping).
+- Standalone csvSanitize helper with unit tests.
+
+### Changed
+- Hardened waitForNavigationComplete: main-frame only, listens to onCompleted, onErrorOccurred, and tabs.onRemoved; removes listeners on all exit paths.
+- README: added Manual QA checklist.
+
+### Tests/CI
+- Expanded Jest coverage with csvSanitize.test.js; all suites passing locally.
+
+### Notes
+- Permissions remain minimal; no webRequest added.

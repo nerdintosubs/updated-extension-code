@@ -23,14 +23,20 @@ function isMyLearn(u){
   } catch { return false; }
 }
 
-function csvEscape(v){
-  if(v==null) return "";
+// Mitigate spreadsheet formula injection by prefixing risky leading characters
+function csvSanitize(v){
+  if (v == null) return "";
   const s = String(v);
+  return /^[=+\-@]/.test(s) ? `'${s}` : s;
+}
+function csvEscape(v){
+  const s = String(v ?? "");
   return /[",\n\r]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s;
 }
 function toCsv(rows){
   const head=["run_at","url","final_url","result","reason","marker","selector","checked_at"];
-  return [head,...rows].map(r=>r.map(csvEscape).join(",")).join("\n");
+  const serialize = (r) => r.map(x => csvEscape(csvSanitize(x))).join(",");
+  return [head,...rows].map(serialize).join("\n");
 }
 function dlCsv(text,name){
   const b=new Blob([text],{type:"text/csv"}),u=URL.createObjectURL(b),a=document.createElement("a");

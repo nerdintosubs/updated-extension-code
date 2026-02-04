@@ -25,6 +25,30 @@ Paste Oracle MyLearn URLs → live render check → export CSV / copy FAIL URLs.
 - Lint: `npm run lint`
 - Test: `npm test`
 
+## Manual QA checklist
+Follow these steps after local changes before packaging or creating a PR:
+
+1. Load unpacked
+   - Chrome → chrome://extensions → Developer mode → Load unpacked → select the ou-link-validator-A folder containing manifest.json.
+2. Prepare sample URLs
+   - Include a mix of known-good course URLs and known soft-404/auth-redirect cases.
+3. Run a check
+   - Paste one URL per line → Check Status.
+   - Confirm progress updates and no console errors in the Service Worker (Inspect views).
+4. Validate results
+   - PASS entries show RENDER_OK and a reasonable selector/marker.
+   - FAIL entries show appropriate why codes (ERROR_TEXT, AUTH_REDIRECT, OFF_HOST_REDIRECT, NO_SELECTOR, etc.).
+5. Verify tab lifecycle
+   - During a run, background tabs open and then close automatically.
+   - Close the popup mid-run: tabs should be cleaned up with no orphans.
+6. CSV export safety
+   - Export CSV (All/FAIL). Values starting with =, +, -, or @ are prefixed with a single quote in the CSV.
+   - Open in Excel/Sheets without formula execution warnings.
+7. Debug toggle
+   - Enable Debug logging in the popup, rerun, and inspect Service Worker logs for navigation/injection breadcrumbs.
+8. Permissions check
+   - Ensure no unexpected permission prompts; host access limited to mylearn.oracle.com.
+
 ## View logs (debugging)
 - Go to chrome://extensions → OU Link Validator → Service worker → Inspect views to see background logs.
 - In the popup, enable "Debug logging" to increase background log verbosity.

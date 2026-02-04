@@ -28,10 +28,10 @@ Task Instructions
 
 task_progress Items:
 - [ ] Step 1: Update CI YAML (.github/workflows/ci.yml) and README.md per plan
-- [ ] Step 2: Modify manifest.json to drop unused "storage" permission
-- [ ] Step 3: Update popup.js to remove http_status column and adjust CSV headers/rows
-- [ ] Step 4: Implement bg.js hardening (navigation listeners cleanup, onErrorOccurred, safePost, per-port openTabs lifecycle, safe done messaging)
-- [ ] Step 5: Ensure src/injectedProbe.js remains self-contained and normalization logic intact
-- [ ] Step 6: Fix/clean unit tests (test/url.test.js, test/softFail.test.js) and ensure integrity
-- [ ] Step 7: Run lint/tests; load unpacked extension; verify tab cleanup and PASS/FAIL results; validate popup close behavior
+- [ ] Step 2: Confirm minimal permissions and host scope in manifest.json
+- [ ] Step 3: Apply CSV hardening and header alignment in popup.js
+- [ ] Step 4: Implement bg.js hardening (navigation listeners cleanup incl. onErrorOccurred and tabs.onRemoved, safePost, per-port openTabs lifecycle, safe done messaging)
+- [ ] Step 5: Ensure src/injectedProbe.js remains self-contained with normalization and BAD URL defense-in-depth
+- [ ] Step 6: Fix/clean unit tests (test/url.test.js, test/softFail.test.js); optionally add CSV sanitizer test
+- [ ] Step 7: Run lint/tests; load unpacked extension; verify tab cleanup and PASS/FAIL flows; validate popup close behavior (no orphan tabs)
 - [ ] Step 8: Prepare release notes (CHANGELOG) and create a tag/PR
