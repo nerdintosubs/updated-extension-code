@@ -63,26 +63,38 @@ export function injectedProbe(cfg) {
     });
   }
 
-  const bodyText = document.body ? (document.body.innerText || "") : "";
-  const err = findSoftFailMarkerInText(bodyText);
-  if (err) {
-    return { ok: false, why: "ERROR_TEXT", mark: err, selector: null, fin: finalUrl };
-  }
-
+  // Poll for both error text and selector presence for the full timeout window.
   return (async () => {
-    const found = await waitForSelectors(cfg.SELECTORS, cfg.TIMEOUT_MS);
+    const start = Date.now();
+    const pollIntervalMs = 200;
 
-    if (found) {
-      // Extra guard: if the matched selector text looks like an error marker, treat as FAIL.
-      const selTextNorm = normalizeText(found.text || "");
-      for (const m of markers) {
-        if (m.norm && selTextNorm.includes(m.norm)) {
-          return { ok: false, why: "ERROR_TEXT", mark: found.text, selector: found.selector, fin: finalUrl };
-        }
+    while (true) {
+      // 1) Check for soft-fail text anywhere in body
+      const bodyText = document.body ? (document.body.innerText || "") : "";
+      const err = findSoftFailMarkerInText(bodyText);
+      if (err) {
+        return { ok: false, why: "ERROR_TEXT", mark: err, selector: null, fin: finalUrl };
       }
-      return { ok: true, why: "RENDER_OK", mark: found.text, selector: found.selector, fin: finalUrl };
-    }
 
-    return { ok: false, why: "NO_SELECTOR", mark: null, selector: null, fin: finalUrl };
+      // 2) Check for expected render selectors
+      const found = querySelectors(cfg.SELECTORS);
+      if (found) {
+        // Guard: ensure the matched element's text isn't actually the error text
+        const selTextNorm = normalizeText(found.text || "");
+        for (const m of markers) {
+          if (m.norm && selTextNorm.includes(m.norm)) {
+            return { ok: false, why: "ERROR_TEXT", mark: found.text, selector: found.selector, fin: finalUrl };
+          }
+        }
+        return { ok: true, why: "RENDER_OK", mark: found.text, selector: found.selector, fin: finalUrl };
+      }
+
+      // Timeout check
+      if (Date.now() - start > (cfg.TIMEOUT_MS || 12000)) {
+        return { ok: false, why: "NO_SELECTOR", mark: null, selector: null, fin: finalUrl };
+      }
+
+      await new Promise((r) => setTimeout(r, pollIntervalMs));
+    }
   })();
 }

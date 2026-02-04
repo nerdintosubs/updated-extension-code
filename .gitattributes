@@ -1,0 +1,17 @@
+* text=auto eol=lf
+
+# Treat these as text always
+*.js text
+*.ts text
+*.json text
+*.md text
+*.yml text
+*.yaml text
+*.cjs text
+
+# Binary
+*.png binary
+*.jpg binary
+*.gif binary
+*.ico binary
+*.crx binary

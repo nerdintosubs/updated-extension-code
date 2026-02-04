@@ -92,15 +92,17 @@ Checked BEFORE injection to avoid unnecessary script execution.
 
 ### 2. **Soft-Fail Marker Detection** (text-based)
 ```
-Error indicators in page body text:
+Error indicators in page body text (normalized; variants handled):
+- "we couldn't find the resource you're looking for"
 - "we couldn't find the resource"
+- "the course you're looking for may already be retired or obsolete"
 - "retired or obsolete"
 - "access denied"
 - "you do not have access"
 - "not authorized"
 - "permission denied"
 ```
-Uses unicode-safe normalization (handles curly quotes, accents, whitespace).
+Uses unicode-safe normalization (handles curly quotes ’, accents, whitespace, case).
 
 ### 3. **Selector Render Detection** (DOM-based)
 Waits up to 12 seconds (default timeout) for ANY of 37 selectors to match, indicating page rendered successfully.

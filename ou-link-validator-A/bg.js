@@ -6,9 +6,12 @@ const CONFIG = {
   HOST: "mylearn.oracle.com",
   BAD_URL_PARTS: ["/login", "/signin", "/sign-in", "/sso", "/oauth", "/auth", "idp", "saml"],
   SOFT_FAIL_MARKERS: [
+    // MyLearn soft-404 / empty-state messages (short + full phrases)
     "we couldn't find the resource",
+    "we couldn't find the resource you're looking for",
     "we couldnt find the resource", // small variant (missing apostrophe)
     "retired or obsolete",
+    "the course you're looking for may already be retired or obsolete",
     "access denied",
     "you do not have access",
     "not authorized",

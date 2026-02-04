@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ou-link-validator-A
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: ou-link-validator-A/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit --no-fund
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Format check
+        run: npm run format:check
+
+      - name: Test (CI)
+        run: npm run test:ci
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage
+          path: ou-link-validator-A/coverage
+
+      - name: Upload junit
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: junit
+          path: test-results
+
+      - name: Package extension zip
+        run: npm run package:zip
+
+      - name: Upload packaged zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: packaged-extension
+          path: dist/ou-link-validator-A.zip
+
+  codeql:
+    uses: github/codeql-action/.github/workflows/codeql.yml@v3

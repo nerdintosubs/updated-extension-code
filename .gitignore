@@ -12,3 +12,9 @@ Thumbs.db
 .vscode/
 *.zip
 ou-link-validator-A/ou-link-validator-A_solution.zip
+dist/
+build/
+.nyc_output/
+test-results/
+playwright-report/
+reports/
