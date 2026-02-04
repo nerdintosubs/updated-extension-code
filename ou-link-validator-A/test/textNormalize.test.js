@@ -6,8 +6,7 @@ describe("textNormalize", () => {
   });
 
   test("normalizeText lowercases, trims, collapses whitespace", () => {
-    expect(normalizeText(" Hello WORLD 
-")).toBe("hello world");
+    expect(normalizeText(" Hello WORLD \n")).toBe("hello world");
   });
 
   test("normalizeText removes combining marks (NFKD)", () => {

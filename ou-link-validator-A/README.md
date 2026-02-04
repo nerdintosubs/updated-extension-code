@@ -25,6 +25,10 @@ Paste Oracle MyLearn URLs → live render check → export CSV / copy FAIL URLs.
 - Lint: `npm run lint`
 - Test: `npm test`
 
+## View logs (debugging)
+- Go to chrome://extensions → OU Link Validator → Service worker → Inspect views to see background logs.
+- In the popup, enable "Debug logging" to increase background log verbosity.
+
 ## CI
 GitHub Actions workflow runs:
 - ESLint
@@ -34,6 +38,11 @@ GitHub Actions workflow runs:
 ## Troubleshooting
 - You must be signed in to MyLearn; otherwise links may redirect to auth and be flagged as FAIL (AUTH_REDIRECT).
 - Enterprise setups may block third-party cookies; if checks fail unexpectedly, allow cookies for https://mylearn.oracle.com.
+
+## Additional docs
+- CHANGELOG: see release notes in CHANGELOG.md
+- Rollback plan: docs/ROLLBACK.md
+- Suggested commit history: docs/COMMIT_HISTORY.md
 
 ## Security & compliance
 - No credentials are embedded; do not add secrets.
