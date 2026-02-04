@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<coverage generated="1770175229625" clover="3.2.0">
-  <project timestamp="1770175229625" name="All files">
+<coverage generated="1770177296618" clover="3.2.0">
+  <project timestamp="1770177296618" name="All files">
     <metrics statements="18" coveredstatements="17" conditionals="20" coveredconditionals="11" methods="9" coveredmethods="9" elements="47" coveredelements="37" complexity="0" loc="18" ncloc="18" packages="1" files="3" classes="3"/>
     <file name="softFail.js" path="C:\Users\Shubham\Documents\updated extension code\ou-link-validator-A\src\softFail.js">
       <metrics statements="5" coveredstatements="5" conditionals="10" coveredconditionals="7" methods="3" coveredmethods="3"/>
