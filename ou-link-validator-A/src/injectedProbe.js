@@ -63,6 +63,31 @@ export function injectedProbe(cfg) {
     });
   }
 
+  // Attempt to read visible text from same-origin iframes (if any).
+  function readSameOriginIframesTextSafe() {
+    const chunks = [];
+    const iframes = Array.from(document.querySelectorAll("iframe"));
+    for (const f of iframes) {
+      try {
+        const doc = f.contentDocument || f.contentWindow?.document;
+        if (doc && doc.body) {
+          chunks.push(String(doc.body.innerText || ""));
+        }
+      } catch { /* cross-origin; ignore */ }
+    }
+    return chunks.join("\n\n");
+  }
+
+  // Heuristic: a short grace period before declaring PASS when we first see
+  // strong course selectors. This avoids premature PASS while the shell loads
+  // and a later soft-fail message appears (common in SPAs).
+  const passGraceMs = (() => {
+    const t = Number(cfg.TIMEOUT_MS || 12000);
+    // 20% of timeout, clamped to [1000, 3000]
+    return Math.max(1000, Math.min(3000, Math.floor(t * 0.2)));
+  })();
+  let strongSeenAt = null;
+
   // Poll for both error text and selector presence for the full timeout window.
   return (async () => {
     const start = Date.now();
@@ -70,11 +95,39 @@ export function injectedProbe(cfg) {
     let sawFallback = false; // saw generic structural selector(s)
 
     while (true) {
-      // 1) Check for soft-fail text anywhere in body
+      // 1) Check for soft-fail text anywhere in body or same-origin iframes
       const bodyText = document.body ? (document.body.innerText || "") : "";
+      const framesText = readSameOriginIframesTextSafe();
+      const combinedText = bodyText + (framesText ? ("\n\n" + framesText) : "");
       const err = findSoftFailMarkerInText(bodyText);
       if (err) {
         return { ok: false, why: "ERROR_TEXT", mark: err, selector: null, fin: finalUrl };
+      }
+      // Also check within iframes
+      const errFrame = framesText ? findSoftFailMarkerInText(combinedText) : null;
+      if (errFrame) {
+        return { ok: false, why: "ERROR_TEXT", mark: errFrame, selector: null, fin: finalUrl };
+      }
+
+      // 1b) Targeted check within main content container for localized or
+      // structured messages that might not hit body immediately.
+      const mainEl = document.querySelector('main, [role="main"], #main, .main-content');
+      if (mainEl) {
+        const mainText = String(mainEl.innerText || "");
+        const mErr = findSoftFailMarkerInText(mainText);
+        if (mErr) {
+          return { ok: false, why: "ERROR_TEXT", mark: mErr, selector: "main|[role=main]", fin: finalUrl };
+        }
+        // Heuristic for common CTAs on error pages (e.g., "Go home")
+        const goCtas = Array.from(mainEl.querySelectorAll('a,button'))
+          .map(el => normalizeText(el.textContent || ""))
+          .filter(t => t.length)
+          .some(t => t.includes("go home"));
+        if (goCtas) {
+          // Only treat as error if no strong content is present below.
+          // Acts as an additional hint that we're on an error/empty state page.
+          sawFallback = true;
+        }
       }
 
       // 2) Prefer strong signals of actual course content first
@@ -86,7 +139,14 @@ export function injectedProbe(cfg) {
             return { ok: false, why: "ERROR_TEXT", mark: strong.text, selector: strong.selector, fin: finalUrl };
           }
         }
-        return { ok: true, why: "HAS_COURSE_ELEMENTS", mark: strong.text, selector: strong.selector, fin: finalUrl };
+        // Defer PASS briefly to avoid premature success before error renders.
+        if (strongSeenAt == null) {
+          strongSeenAt = Date.now();
+        }
+        if (Date.now() - strongSeenAt >= passGraceMs) {
+          return { ok: true, why: "HAS_COURSE_ELEMENTS", mark: strong.text, selector: strong.selector, fin: finalUrl };
+        }
+        // Not enough time elapsed; continue polling
       }
 
       // 3) Check fallback structural selectors; record that the page rendered structurally
