@@ -34,4 +34,32 @@ describe("softFail detection", () => {
     ]);
     expect(findSoftFailMarker(body, compiled)).toBe("the course you're looking for may already be retired or obsolete");
   });
+
+  test("returns null when compiled markers is empty", () => {
+    const compiled = compileMarkers([]);
+    expect(findSoftFailMarker("some normal page", compiled)).toBeNull();
+  });
+
+  test("ignores empty-string markers (norm falsy branch)", () => {
+    const compiled = compileMarkers([""]);
+    // m.norm is empty; should not match anything
+    expect(findSoftFailMarker("anything", compiled)).toBeNull();
+  });
+
+  test("prefers first matching marker when multiple present", () => {
+    const body = "access denied. you do not have access";
+    const compiled = compileMarkers(["access denied", "you do not have access"]);
+    expect(findSoftFailMarker(body, compiled)).toBe("access denied");
+  });
+
+  test("handles undefined compiledMarkers gracefully (returns null)", () => {
+    // @ts-ignore - passing undefined intentionally
+    expect(findSoftFailMarker("any", undefined)).toBeNull();
+  });
+
+  test("handles undefined bodyText (normalizes to empty string)", () => {
+    const compiled = compileMarkers(["access denied"]);
+    // @ts-ignore - passing undefined intentionally
+    expect(findSoftFailMarker(undefined, compiled)).toBeNull();
+  });
 });

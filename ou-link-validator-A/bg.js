@@ -17,6 +17,34 @@ const CONFIG = {
     "not authorized",
     "permission denied"
   ],
+  // Strong indicators that actual course/learning content is present.
+  STRONG_SELECTORS: [
+    // Data/test attributes commonly used in MyLearn UI components
+    '[data-testid*="course"]',
+    '[data-testid*="learning"]',
+    '[data-testid*="module"]',
+    '[data-testid*="lesson"]',
+    '[data-test*="course"]',
+    '[data-test*="learning"]',
+    '[data-test*="module"]',
+    '[data-test*="lesson"]',
+
+    // Lists and items
+    '[class*="course-card"]',
+    '[class*="course-list"]',
+    '[class*="course-item"]',
+    '[class*="learning-path"]',
+    '[class*="module"]',
+    '[class*="lesson"]',
+    '[class*="content-item"]',
+    '[class*="curriculum"]',
+    '[class*="outline"]',
+
+    // Roles/labels
+    '[role="list"] [class*="course"]',
+    '[aria-label*="course" i]',
+    '[aria-label*="learning" i]'
+  ],
   // Expanded selectors for better course page detection (Oracle MyLearn)
   // Matches various course/learning path/content page patterns:
   // - Main content h1/h2/h3 headings
@@ -257,6 +285,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.type === "getDefaults") {
     sendResponse({
       selectors: CONFIG.SELECTORS,
+      strongSelectors: CONFIG.STRONG_SELECTORS,
       timeoutMs: CONFIG.TIMEOUT_MS,
       concurrency: 3,
     });

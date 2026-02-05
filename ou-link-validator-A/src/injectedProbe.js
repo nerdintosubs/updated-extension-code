@@ -67,6 +67,7 @@ export function injectedProbe(cfg) {
   return (async () => {
     const start = Date.now();
     const pollIntervalMs = 200;
+    let sawFallback = false; // saw generic structural selector(s)
 
     while (true) {
       // 1) Check for soft-fail text anywhere in body
@@ -76,21 +77,36 @@ export function injectedProbe(cfg) {
         return { ok: false, why: "ERROR_TEXT", mark: err, selector: null, fin: finalUrl };
       }
 
-      // 2) Check for expected render selectors
-      const found = querySelectors(cfg.SELECTORS);
-      if (found) {
-        // Guard: ensure the matched element's text isn't actually the error text
-        const selTextNorm = normalizeText(found.text || "");
+      // 2) Prefer strong signals of actual course content first
+      const strong = querySelectors(cfg.STRONG_SELECTORS || []);
+      if (strong) {
+        const selTextNorm = normalizeText(strong.text || "");
         for (const m of markers) {
           if (m.norm && selTextNorm.includes(m.norm)) {
-            return { ok: false, why: "ERROR_TEXT", mark: found.text, selector: found.selector, fin: finalUrl };
+            return { ok: false, why: "ERROR_TEXT", mark: strong.text, selector: strong.selector, fin: finalUrl };
           }
         }
-        return { ok: true, why: "RENDER_OK", mark: found.text, selector: found.selector, fin: finalUrl };
+        return { ok: true, why: "HAS_COURSE_ELEMENTS", mark: strong.text, selector: strong.selector, fin: finalUrl };
+      }
+
+      // 3) Check fallback structural selectors; record that the page rendered structurally
+      const fallback = querySelectors(cfg.SELECTORS || []);
+      if (fallback) {
+        sawFallback = true;
+        const selTextNorm = normalizeText(fallback.text || "");
+        for (const m of markers) {
+          if (m.norm && selTextNorm.includes(m.norm)) {
+            return { ok: false, why: "ERROR_TEXT", mark: fallback.text, selector: fallback.selector, fin: finalUrl };
+          }
+        }
+        // Do not return PASS yet; wait for strong evidence of course content.
       }
 
       // Timeout check
       if (Date.now() - start > (cfg.TIMEOUT_MS || 12000)) {
+        if (sawFallback) {
+          return { ok: false, why: "NO_COURSE_CONTENT", mark: null, selector: null, fin: finalUrl };
+        }
         return { ok: false, why: "NO_SELECTOR", mark: null, selector: null, fin: finalUrl };
       }
 

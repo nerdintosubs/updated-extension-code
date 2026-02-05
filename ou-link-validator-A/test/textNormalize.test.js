@@ -13,4 +13,17 @@ describe("textNormalize", () => {
     const s = "Café"; // e + combining acute
     expect(normalizeText(s)).toBe("cafe");
   });
+
+  test("normalizePunctuation converts smart quotes and dashes", () => {
+    expect(normalizePunctuation("“Hello”—World”")).toBe('"Hello"-World"');
+  });
+
+  test("normalizePunctuation handles null input (coalesces to empty)", () => {
+    expect(normalizePunctuation(null)).toBe("");
+  });
+
+  test("normalizeText handles null and collapses tabs/newlines", () => {
+    expect(normalizeText(null)).toBe("");
+    expect(normalizeText("A\t\tB\nC")).toBe("a b c");
+  });
 });

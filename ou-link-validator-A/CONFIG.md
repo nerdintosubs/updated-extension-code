@@ -105,7 +105,11 @@ Error indicators in page body text (normalized; variants handled):
 Uses unicode-safe normalization (handles curly quotes ’, accents, whitespace, case).
 
 ### 3. **Selector Render Detection** (DOM-based)
-Waits up to 12 seconds (default timeout) for ANY of 37 selectors to match, indicating page rendered successfully.
+The probe polls for up to 12 seconds:
+- If SOFT_FAIL markers appear → FAIL (ERROR_TEXT)
+- If STRONG_SELECTORS (course/learning elements) appear → PASS (HAS_COURSE_ELEMENTS)
+- If only FALLBACK SELECTORS (headings/structure) appear and no STRONG elements before timeout → FAIL (NO_COURSE_CONTENT)
+- If nothing matches before timeout → FAIL (NO_SELECTOR)
 
 ---
 
@@ -190,10 +194,11 @@ Users can add custom selectors in the Settings panel. Useful for:
 
 | State | Detected By | Layer |
 |-------|------------|-------|
-| PASS (RENDER_OK) | Selector match + no error text | Layer 3 + Layer 2 |
+| PASS (HAS_COURSE_ELEMENTS) | Strong selector match + no error text | Layer 3 + Layer 2 |
 | FAIL (ERROR_TEXT) | Soft-fail marker in text | Layer 2 |
 | FAIL (AUTH_REDIRECT) | URL keyword match | Layer 1 |
 | FAIL (OFF_HOST_REDIRECT) | Hostname check | Layer 1 |
+| FAIL (NO_COURSE_CONTENT) | Only fallback structure seen; no strong course elements before timeout | Layer 3 timeout |
 | FAIL (NO_SELECTOR) | Timeout + no selectors match | Layer 3 timeout |
 | FAIL (INJECT_ERR) | Script injection failure | Layer 3 |
 | FAIL (BG_ERR) | Background worker exception | Layer 0 |
