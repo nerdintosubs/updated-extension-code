@@ -15,7 +15,10 @@
     "test": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --coverage",
     "test:ci": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --ci --coverage",
     "prepare": "husky install ../.husky",
-    "package:zip": "powershell -NoProfile -ExecutionPolicy Bypass -File ../scripts/package.ps1"
+    "package:zip": "powershell -NoProfile -ExecutionPolicy Bypass -File ../scripts/package.ps1",
+    "measure:urls": "powershell -NoProfile -Command \"$ts=(Get-Date -Format 'yyyyMMdd-HHmm'); node ../scripts/measure-urls.js --input ../test-results/url_measurement/urls_ground_truth.csv --out ../test-results/url_measurement/run-$ts\"",
+    "measure:summary": "node ../scripts/summarize-measurement.js --in ../test-results/url_measurement/latest/results.csv --out ../test-results/url_measurement/latest/summary.json",
+    "measure:quick": "node ../scripts/measure-urls.js --input ../test-results/url_measurement/urls_ground_truth.csv --out ../test-results/url_measurement/latest && node ../scripts/summarize-measurement.js --in ../test-results/url_measurement/latest/results.csv --out ../test-results/url_measurement/latest/summary.json"
   },
   "jest": {
     "testEnvironment": "node",
