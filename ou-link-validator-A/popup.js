@@ -70,7 +70,9 @@ window.addEventListener("DOMContentLoaded", () => {
 function isMyLearn(u) {
   try {
     const x = new URL(u.trim());
-    return x.hostname === HOST && ["https:", "http:"].includes(x.protocol);
+    return x.hostname === HOST &&
+           ["https:", "http:"].includes(x.protocol) &&
+           x.pathname.startsWith('/ou/');
   } catch { return false; }
 }
 

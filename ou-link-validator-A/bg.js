@@ -165,6 +165,61 @@ function safePost(port, msg) {
   try { port.postMessage(msg); } catch { }
 }
 
+/**
+ * Check for URL redirects and return appropriate error response.
+ */
+function checkUrlRedirects(finalUrl, config) {
+  const offHost = isOffHost(finalUrl, config.HOST);
+  const badAuth = includesBadAuthPart(finalUrl, config.BAD_URL_PARTS);
+
+  if (offHost) return { ok: false, why: "OFF_HOST_REDIRECT", fin: finalUrl };
+  if (badAuth) return { ok: false, why: "AUTH_REDIRECT", fin: finalUrl };
+  return null;
+}
+
+/**
+ * Safely remove a tab with retry logic.
+ */
+async function safeRemoveTab(tabId, retries = 3) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      await chrome.tabs.remove(tabId);
+      return;
+    } catch (error) {
+      if (i === retries - 1) logDebug({ DEBUG: true }, `Failed to remove tab ${tabId} after ${retries} attempts:`, error);
+      await new Promise(resolve => setTimeout(resolve, 100 * (i + 1)));
+    }
+  }
+}
+
+/**
+ * Rate limiter to prevent abuse of concurrent validations.
+ */
+class RateLimiter {
+  constructor(maxConcurrent = 6) {
+    this.active = 0;
+    this.maxConcurrent = maxConcurrent;
+    this.queue = [];
+  }
+
+  async acquire() {
+    if (this.active >= this.maxConcurrent) {
+      await new Promise(resolve => this.queue.push(resolve));
+    }
+    this.active++;
+  }
+
+  release() {
+    this.active--;
+    if (this.queue.length > 0) {
+      const resolve = this.queue.shift();
+      resolve();
+    }
+  }
+}
+
+const rateLimiter = new RateLimiter();
+
 // Per-connection (popup session) state
 const portState = new Map(); // port -> {queue:[], active:number, concurrency:number, cfg:CONFIG, openTabs:Set<number>}
 
@@ -173,6 +228,9 @@ async function processJob(job, port, effCfg) {
   let tabId = null;
 
   try {
+    // Acquire rate limiter to prevent abuse
+    await rateLimiter.acquire();
+
     const state = portState.get(port);
     if (!state) return; // disconnected
     const created = await chrome.tabs.create({ url: job.norm, active: false });
@@ -188,13 +246,12 @@ async function processJob(job, port, effCfg) {
       finalUrl = info.url || job.norm;
     } catch { }
 
-    const offHost = isOffHost(finalUrl, effCfg.HOST);
-    const badAuth = includesBadAuthPart(finalUrl, effCfg.BAD_URL_PARTS);
-    logDebug(effCfg, "navigate", { orig: job.orig, norm: job.norm, finalUrl, offHost, badAuth });
+    const redirectCheck = checkUrlRedirects(finalUrl, effCfg);
+    logDebug(effCfg, "navigate", { orig: job.orig, norm: job.norm, finalUrl, redirect: redirectCheck });
 
     let payload;
-    if (offHost || badAuth) {
-      payload = { ok: false, why: offHost ? "OFF_HOST_REDIRECT" : "AUTH_REDIRECT", fin: finalUrl };
+    if (redirectCheck) {
+      payload = redirectCheck;
     } else {
       const [res] = await chrome.scripting.executeScript({
         target: { tabId },
@@ -223,10 +280,12 @@ async function processJob(job, port, effCfg) {
     });
   } finally {
     if (tabId != null) {
-      try { await chrome.tabs.remove(tabId); } catch { }
+      await safeRemoveTab(tabId);
       const state = portState.get(port);
       if (state) state.openTabs.delete(tabId);
     }
+    // Release rate limiter
+    rateLimiter.release();
   }
 }
 

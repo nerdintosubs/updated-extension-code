@@ -14,7 +14,7 @@ export function injectedProbe(cfg) {
     return new RegExp((cfg.BAD_URL_PARTS || []).map(esc).join("|"), "i");
   })();
 
-  // Normalize unicode punctuation + text for matching
+  // Normalize unicode punctuation + text for matching (shared logic)
   function normalizePunctuation(s) {
     return String(s || "")
       .replace(/[\u2018\u2019\u02BC\uFF07]/g, "'")  // apostrophes
